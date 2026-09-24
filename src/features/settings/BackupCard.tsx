@@ -1,11 +1,12 @@
-import { AlertTriangle, CheckCircle2, FolderOpen, HardDriveDownload, Loader2, PauseCircle, RefreshCw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { AlertTriangle, CheckCircle2, FolderCog, FolderOpen, HardDriveDownload, History, Loader2, PauseCircle, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { chooseFolder, disable, KEEP_DAILY, LATEST_FILE, reactivate, resolveExisting, runBackup, useBackupState } from '../../lib/autoBackup'
-import { useConfirm } from '../../ui/Confirm'
-import { useToast } from '../../ui/Toast'
+import { chooseFolder, disable, KEEP_DAILY, LATEST_FILE, reactivate, resolvePending, runBackup, useBackupState, switchToProjectFolder, type BackupState } from '../../lib/autoBackup'
+import type { BackupMeta } from '../../lib/backupFiles'
 import { Button } from '../../ui/Button'
 import { cn } from '../../ui/cn'
+import { useConfirm } from '../../ui/Confirm'
+import { useToast } from '../../ui/Toast'
 
 /** "agora", "há 5 min", "há 2 h", ou a data. Re-renderiza a cada 30 s. */
 function useRelative(ts?: number) {
@@ -27,46 +28,67 @@ const ignoreAbort = (e: unknown) => {
   if (!(e instanceof DOMException && e.name === 'AbortError')) throw e
 }
 
-export function BackupCard() {
+const folderName = (s: BackupState) => (s.kind === 'projeto' ? 'backups/ do projeto' : s.folder)
+
+/**
+ * Pergunta de restauração: aparece sozinha ao abrir o app quando o destino do
+ * backup tem dados e este navegador está vazio (ex: limpou os dados).
+ */
+function useRestorePrompt() {
   const s = useBackupState()
-  const last = useRelative(s.lastAt)
   const confirm = useConfirm()
   const toast = useToast()
+  const asked = useRef(false)
+  const folder = folderName(s)
 
-  const pick = async () => {
-    const existing = await chooseFolder().catch((e) => (ignoreAbort(e), null))
-    if (!existing) return
-    const when = new Date(existing.exportedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const ask = async (meta: BackupMeta) => {
+    const when = new Date(meta.exportedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     const restore = await confirm({
-      title: 'Essa pasta já tem um backup',
+      title: 'Encontrei um backup seu',
       message: (
         <>
-          Backup de <b className="text-text">{when}</b> com <b className="text-text">{existing.lineups}</b> {existing.lineups === 1 ? 'posição' : 'posições'}. Quer restaurar ele agora? Se escolher não, os dados atuais deste navegador passam a ser o backup; o arquivo antigo é guardado como cópia na pasta.
+          Na pasta <b className="text-text">{folder}</b> tem um backup de <b className="text-text">{when}</b> com <b className="text-text">{meta.spots}</b> {meta.spots === 1 ? 'ponto' : 'pontos'} e{' '}
+          <b className="text-text">{meta.lineups}</b> {meta.lineups === 1 ? 'posição' : 'posições'}, e este navegador está vazio. Restaurar agora?
+          <br />
+          <br />
+          Se começar do zero, o backup antigo é guardado como cópia na mesma pasta antes.
         </>
       ),
       confirmLabel: 'Restaurar backup',
-      cancelLabel: 'Não, substituir',
+      cancelLabel: 'Não, começar do zero',
       tone: 'primary',
     })
-    if (restore === null) {
-      // fechou sem escolher: não arrisca nada, desconecta a pasta
-      await disable()
-      return toast('Nada foi alterado. A pasta não foi conectada.')
-    }
-    await resolveExisting(restore ? 'restaurar' : 'substituir', existing)
-    toast(restore ? 'Backup restaurado' : 'Backup atualizado com os dados atuais')
+    if (restore === null) return // fechou sem escolher: continua pendente, o aviso no topo fica
+    await resolvePending(restore ? 'restaurar' : 'substituir')
+    toast(restore ? 'Backup restaurado' : 'Começando do zero; o backup antigo foi guardado como cópia')
   }
 
-  if (s.status === 'indisponivel') {
+  const askRef = useRef(ask)
+  askRef.current = ask
+  useEffect(() => {
+    if (s.status === 'restaurar' && s.pending && !asked.current) {
+      asked.current = true
+      void askRef.current(s.pending)
+    }
+  }, [s.status, s.pending])
+
+  return () => s.pending && ask(s.pending)
+}
+
+export function BackupCard() {
+  const s = useBackupState()
+  const last = useRelative(s.lastAt)
+  const pick = () => chooseFolder().catch(ignoreAbort)
+
+  if (!s.projectAvailable && !s.folderPickerAvailable && s.status === 'desligado') {
     return (
       <div className="rounded-xl border border-line bg-panel p-4 text-sm text-muted">
-        Este navegador não permite gravar numa pasta do PC. O backup automático funciona no <b className="text-text">Edge</b> ou no <b className="text-text">Chrome</b>. Aqui, use o exportar manual abaixo.
+        Backup automático indisponível aqui: rode o app com <code className="text-text">npm run dev</code> (grava em <code className="text-text">backups/</code>) ou use Edge/Chrome pra escolher uma pasta. Enquanto isso, use o exportar manual abaixo.
       </div>
     )
   }
 
-  const tone =
-    s.status === 'ativo' || s.status === 'salvando' ? 'ok' : s.status === 'desligado' ? 'neutro' : s.status === 'pausado' ? 'aviso' : 'erro'
+  const tone = s.status === 'ativo' || s.status === 'salvando' ? 'ok' : s.status === 'desligado' ? 'neutro' : s.status === 'erro' ? 'erro' : 'aviso'
 
   return (
     <div
@@ -86,7 +108,19 @@ export function BackupCard() {
             tone === 'ok' ? 'bg-accent/15 text-accent' : tone === 'aviso' ? 'bg-[#ffb547]/15 text-[#ffb547]' : tone === 'erro' ? 'bg-danger/15 text-danger' : 'bg-panel-3 text-muted',
           )}
         >
-          {s.status === 'salvando' ? <Loader2 size={19} className="animate-spin" /> : tone === 'ok' ? <CheckCircle2 size={19} /> : tone === 'aviso' ? <PauseCircle size={19} /> : tone === 'erro' ? <AlertTriangle size={19} /> : <HardDriveDownload size={19} />}
+          {s.status === 'salvando' ? (
+            <Loader2 size={19} className="animate-spin" />
+          ) : tone === 'ok' ? (
+            <CheckCircle2 size={19} />
+          ) : s.status === 'restaurar' ? (
+            <History size={19} />
+          ) : tone === 'aviso' ? (
+            <PauseCircle size={19} />
+          ) : tone === 'erro' ? (
+            <AlertTriangle size={19} />
+          ) : (
+            <HardDriveDownload size={19} />
+          )}
         </span>
 
         <div className="min-w-0 flex-1">
@@ -94,7 +128,7 @@ export function BackupCard() {
             {s.status === 'desligado' && 'Backup automático desligado'}
             {(s.status === 'ativo' || s.status === 'salvando') && (
               <>
-                Salvando automaticamente em <span className="text-accent">{s.folder}</span>
+                Salvando automaticamente em <span className="text-accent">{folderName(s)}</span>
               </>
             )}
             {s.status === 'pausado' && (
@@ -102,26 +136,40 @@ export function BackupCard() {
                 Backup pausado em <span className="text-[#ffb547]">{s.folder}</span>
               </>
             )}
+            {s.status === 'restaurar' && 'Backup encontrado, aguardando sua decisão'}
             {s.status === 'erro' && 'Não foi possível gravar o backup'}
           </p>
           <p className="mt-1 text-sm leading-relaxed text-muted">
             {s.status === 'desligado' &&
-              'Escolha uma pasta e o app grava tudo lá sozinho a cada alteração. Limpar os dados do navegador não afeta esses arquivos. Dica: uma pasta dentro do OneDrive ou Google Drive vira cópia na nuvem.'}
+              (s.projectAvailable
+                ? 'Ligue pra gravar sozinho na pasta backups/ do projeto a cada alteração.'
+                : 'Escolha uma pasta e o app grava tudo lá sozinho a cada alteração.')}
             {(s.status === 'ativo' || s.status === 'salvando') && (
               <>
-                Último backup: <b className="text-text">{s.status === 'salvando' ? 'salvando…' : last}</b>. Arquivo principal <code className="text-xs text-text">{LATEST_FILE}</code> + uma cópia por dia dos últimos {KEEP_DAILY} dias.
+                Último backup: <b className="text-text">{s.status === 'salvando' ? 'salvando…' : last}</b>. Arquivo <code className="text-xs text-text">{LATEST_FILE}</code> + uma cópia por dia dos últimos {KEEP_DAILY} dias.
+                {s.kind === 'projeto' && (
+                  <span className="mt-1 block break-all text-xs text-faint" title="Caminho completo">
+                    {s.folder}
+                  </span>
+                )}
               </>
             )}
-            {s.status === 'pausado' && 'Por segurança, o navegador pede sua confirmação para voltar a gravar na pasta depois que ele é reaberto. As alterações feitas enquanto isso entram no próximo backup.'}
+            {s.status === 'pausado' && 'O navegador pede sua confirmação pra voltar a gravar na pasta depois de reaberto. As alterações feitas enquanto isso entram no próximo backup.'}
+            {s.status === 'restaurar' && 'Nada foi gravado por cima. Escolha se quer restaurar o backup ou começar do zero.'}
             {s.status === 'erro' && (s.error ?? 'Erro desconhecido.')}
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {s.status === 'desligado' && (
-            <Button variant="primary" icon={<FolderOpen size={15} />} onClick={pick}>
-              Escolher pasta
-            </Button>
+          {s.status === 'restaurar' && (
+            <>
+              <Button variant="primary" icon={<History size={15} />} onClick={() => resolvePending('restaurar')}>
+                Restaurar
+              </Button>
+              <Button variant="ghost" onClick={() => resolvePending('substituir')}>
+                Começar do zero
+              </Button>
+            </>
           )}
           {s.status === 'pausado' && (
             <Button variant="primary" icon={<RefreshCw size={15} />} onClick={() => reactivate()}>
@@ -133,21 +181,28 @@ export function BackupCard() {
               Salvar agora
             </Button>
           )}
+          {s.projectAvailable && s.kind !== 'projeto' && (
+            <Button variant={s.status === 'desligado' ? 'primary' : 'ghost'} icon={<FolderCog size={15} />} onClick={() => switchToProjectFolder()}>
+              Usar pasta do projeto
+            </Button>
+          )}
+          {s.folderPickerAvailable && (
+            <Button variant={s.status === 'desligado' && !s.projectAvailable ? 'primary' : 'ghost'} icon={<FolderOpen size={15} />} onClick={pick}>
+              {s.kind === 'pasta' ? 'Trocar pasta' : 'Usar outra pasta'}
+            </Button>
+          )}
           {s.status !== 'desligado' && (
-            <>
-              <Button variant="ghost" onClick={pick}>
-                Trocar pasta
-              </Button>
-              <Button variant="ghost" onClick={() => disable()}>
-                Desligar
-              </Button>
-            </>
+            <Button variant="ghost" onClick={() => disable()}>
+              Desligar
+            </Button>
           )}
         </div>
       </div>
       {s.status !== 'desligado' && (
         <p className="mt-4 border-t border-line/70 pt-3 text-xs text-faint">
-          Limpou o navegador? Clique em <b className="text-muted">Escolher pasta</b> e selecione esta mesma pasta: o app encontra o backup e oferece restaurar. Pra voltar a um dia específico, use <b className="text-muted">Importar backup</b> com a cópia daquele dia.
+          {s.kind === 'projeto'
+            ? 'Limpou o navegador? Ao abrir, o app encontra o backup nessa pasta e pergunta se quer restaurar. Pra voltar a um dia específico, use Importar backup com a cópia daquele dia. Dica: "Usar outra pasta" dentro do OneDrive/Drive dá cópia na nuvem.'
+            : 'Limpou o navegador? Escolha esta mesma pasta de novo: o app encontra o backup e pergunta se quer restaurar. Pra voltar a um dia específico, use Importar backup com a cópia daquele dia.'}
         </p>
       )}
     </div>
@@ -158,9 +213,17 @@ export function BackupCard() {
 export function BackupIndicator() {
   const s = useBackupState()
   const last = useRelative(s.lastAt)
-  if (s.status === 'indisponivel') return null
+  const askRestore = useRestorePrompt()
+  if (!s.projectAvailable && !s.folderPickerAvailable && s.status === 'desligado') return null
 
   const base = 'flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors'
+  if (s.status === 'restaurar') {
+    return (
+      <button type="button" onClick={() => askRestore()} className={cn(base, 'border-[#ffb547]/40 bg-[#ffb547]/10 text-[#ffb547] hover:bg-[#ffb547]/15')}>
+        <History size={14} /> Backup encontrado · restaurar?
+      </button>
+    )
+  }
   if (s.status === 'pausado') {
     return (
       <button type="button" onClick={() => reactivate()} className={cn(base, 'border-[#ffb547]/40 bg-[#ffb547]/10 text-[#ffb547] hover:bg-[#ffb547]/15')} title="O navegador pede confirmação pra voltar a gravar na pasta">

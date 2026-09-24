@@ -126,7 +126,7 @@ function DataSection({ delay }: { delay: number }) {
   }
 
   return (
-    <Section title="Dados" description="Nada vai pra servidor nenhum: os dados ficam no IndexedDB deste navegador." delay={delay}>
+    <Section title="Dados" description="Nada sai do seu PC: os dados ficam neste navegador e o backup numa pasta local." delay={delay}>
       <div className="mb-3">
         <BackupCard />
       </div>

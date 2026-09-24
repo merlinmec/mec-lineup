@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dailyName, dailyToPrune, LATEST_FILE } from './autoBackup'
+import { dailyName, dailyToPrune, LATEST_FILE } from './backupFiles'
 
 describe('cópias diárias do backup', () => {
   it('usa a data local no nome', () => {

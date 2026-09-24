@@ -3,5 +3,8 @@ dist
 *.local
 *.tsbuildinfo
 
+# backups automáticos: seus dados e prints, e podem ficar grandes
+backups/
+
 # prints de outros apps e artes da Riot usados só como referência visual
 referencias/
