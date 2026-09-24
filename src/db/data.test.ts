@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { exportBackup, importBackup, isBackupFile } from '../lib/backup'
 import Dexie from 'dexie'
 import { toGameMaps, VIPER_ID, type ApiMap } from '../lib/valorantApi'
-import { fillShapes, LineupDB } from './db'
+import { fillShapes, LineupDB, moveResultToLineups } from './db'
 import { ensureSeeded, fillMapScales } from './seed'
 
 let n = 0
@@ -164,5 +164,52 @@ describe('revisão das habilidades (v6)', () => {
     await database.maps.put({ id: 'haven', name: 'Haven', cover: {}, minimap: {}, rotation: 0, order: 0, createdAt: 1 })
     await fillMapScales(database, async () => ({ data: [{ uuid: 'haven', xMultiplier: 0.000075 } as never] }))
     expect((await database.maps.get('haven'))?.scale).toBeCloseTo(0.0075)
+  })
+})
+
+describe('print de "onde cai" por posição (v7)', () => {
+  const img = (n: number) => new Blob([new Uint8Array([n])], { type: 'image/webp' })
+  const lineup = (id: string, spotId: string, extra = {}) => ({
+    id, spotId, title: id, notes: '', throwType: '', side: 'ambos' as const, x: 0, y: 0, createdAt: 1, ...extra,
+  })
+
+  it('copia do ponto pras posições sem sobrescrever e tira do ponto', async () => {
+    await database.spots.put({ id: 's1', mapId: 'm', abilityId: 'veneno', name: 'A', x: 0, y: 0, createdAt: 1, resultImage: img(1), resultMarks: [] })
+    await database.lineups.bulkPut([lineup('l1', 's1'), lineup('l2', 's1', { resultImage: img(2) })])
+    await moveResultToLineups((n) => database.table(n))
+
+    const bytes = async (b?: Blob) => [...new Uint8Array(await b!.arrayBuffer())]
+    expect(await bytes((await database.lineups.get('l1'))?.resultImage)).toEqual([1])
+    expect(await bytes((await database.lineups.get('l2'))?.resultImage)).toEqual([2]) // já tinha: mantém
+    expect((await database.spots.get('s1'))?.resultImage).toBeUndefined()
+  })
+
+  it('ponto sem posição mantém o print, e a primeira posição criada herda', async () => {
+    const { lineupsRepo } = await import('./repo')
+    const { db } = await import('./db')
+    await db.spots.put({ id: 'orfao', mapId: 'm', abilityId: 'veneno', name: 'B', x: 0, y: 0, createdAt: 1, resultImage: img(7) })
+    await moveResultToLineups((n) => db.table(n))
+    expect((await db.spots.get('orfao'))?.resultImage).toBeDefined()
+
+    const created = await lineupsRepo.create({ spotId: 'orfao', x: 0.1, y: 0.1 })
+    expect(created.resultImage).toBeDefined()
+    expect((await db.spots.get('orfao'))?.resultImage).toBeUndefined()
+  })
+})
+
+describe('importar backup antigo (v2) com "onde cai" no ponto', () => {
+  it('move o print pras posições na importação', async () => {
+    const res = { __blob: 'data:image/webp;base64,AQ==' }
+    const file = {
+      format: 'mec-lineup-backup', version: 2, exportedAt: '',
+      tables: {
+        maps: [], agents: [], abilities: [], settings: [],
+        spots: [{ id: 's', mapId: 'm', abilityId: 'veneno', name: 'A', x: 0, y: 0, createdAt: 1, resultImage: res }],
+        lineups: [{ id: 'l', spotId: 's', title: 'P', notes: '', throwType: '', side: 'ambos', x: 0, y: 0, createdAt: 1 }],
+      },
+    }
+    await importBackup(file as never, database)
+    expect((await database.lineups.get('l'))?.resultImage).toBeDefined()
+    expect((await database.spots.get('s'))?.resultImage).toBeUndefined()
   })
 })

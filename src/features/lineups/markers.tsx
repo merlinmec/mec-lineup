@@ -174,6 +174,8 @@ interface LineupMarkerProps {
   active: boolean
   /** Do outro lado do filtro (só aparece assim no modo edição). */
   dimmed?: boolean
+  /** Edição: posição sem o print do pixel, que é obrigatório. */
+  missingAim?: boolean
   draggable: boolean
   delay: number
   onClick: () => void
@@ -183,7 +185,7 @@ interface LineupMarkerProps {
 }
 
 /** Onde o jogador precisa estar. Ícone padrão: cabeça da Viper. */
-export function LineupMarker({ point, from, color, icon, label, active, dimmed, draggable, delay, onClick, onMove, onDrag, onHover }: LineupMarkerProps) {
+export function LineupMarker({ point, from, color, icon, label, active, dimmed, missingAim, draggable, delay, onClick, onMove, onDrag, onHover }: LineupMarkerProps) {
   return (
     <MarkerShell
       point={point}
@@ -210,6 +212,14 @@ export function LineupMarker({ point, from, color, icon, label, active, dimmed, 
       >
         <Img source={icon} alt="" className="size-full object-cover" />
       </div>
+      {missingAim && (
+        <span
+          title="Falta o print do pixel"
+          className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-2 border-bg bg-[#ffb547] text-[9px] font-black text-bg"
+        >
+          !
+        </span>
+      )}
     </MarkerShell>
   )
 }

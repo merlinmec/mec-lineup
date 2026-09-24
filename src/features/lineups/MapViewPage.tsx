@@ -14,7 +14,6 @@ import { cn } from '../../ui/cn'
 import { Img } from '../../ui/Img'
 import { LineupPreview } from './LineupPreview'
 import { LineupLinks, LineupMarker, ShapeHandle, SpotMarker, SpotShape } from './markers'
-import { ResultDock, SpotResultPreview } from './SpotResult'
 import { constrainEnd, geometryFor, iconAnchor, shapeSpec, translate, withDefaults, type FullGeometry, type ShapeSpec } from '../../lib/shapes'
 import { LineupDetail, LineupEditor, SpotEditor } from './panels'
 import { isTyping, Stage } from './Stage'
@@ -151,7 +150,6 @@ function MapView({ map }: { map: GameMap }) {
   const liveGeom = (sp: Spot) => (shapeDrag?.id === sp.id ? shapeDrag.g : storedGeom(sp))
   const anchorOf = (sp: Spot) => iconAnchor(liveGeom(sp), shape)
   const saveGeom = (id: string, g: FullGeometry) => spotsRepo.update(id, geometryFor(g, shape))
-  const hoveredSpot = abilitySpots.find((sp) => sp.id === hoverSpot)
   const spotState = (id: string) =>
     id === selectedSpot?.id ? 'selecionado' : selectedSpot ? 'apagado' : id === hoverSpot ? 'destacado' : ('normal' as const)
 
@@ -206,11 +204,7 @@ function MapView({ map }: { map: GameMap }) {
                 <>
                   <AnimatePresence>
                     {hovered && !dragging && hovered.id !== lineupId && <LineupPreview key={hovered.id} lineup={hovered} color={ability?.color ?? '#fff'} />}
-                    {!hovered && !dragging && !shapeDrag && hoveredSpot?.resultImage && ability && hoveredSpot.id !== selectedSpot?.id && (
-                      <SpotResultPreview key={`res-${hoveredSpot.id}`} spot={hoveredSpot} ability={ability} at={anchorOf(hoveredSpot)} />
-                    )}
                   </AnimatePresence>
-                  <AnimatePresence>{selectedSpot && ability && !editing && <ResultDock key={`dock-${selectedSpot.id}`} spot={selectedSpot} ability={ability} />}</AnimatePresence>
                 </>
               }
             >
@@ -283,6 +277,7 @@ function MapView({ map }: { map: GameMap }) {
                       shownLineups.map((l, i) => (
                         <LineupMarker
                           dimmed={!matchesSide(l.side, sideFilter)}
+                          missingAim={editing && !l.aimImage}
                           key={l.id}
                           point={l}
                           from={anchorOf(selectedSpot)}

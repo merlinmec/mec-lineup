@@ -1,4 +1,4 @@
-import { db as defaultDb, fillShapes, migrateToAgents, type LineupDB } from '../db/db'
+import { db as defaultDb, fillShapes, migrateToAgents, moveResultToLineups, type LineupDB } from '../db/db'
 
 /**
  * Backup em JSON único: Blobs viram data URLs pra que o arquivo carregue os
@@ -7,7 +7,7 @@ import { db as defaultDb, fillShapes, migrateToAgents, type LineupDB } from '../
  */
 const BLOB_TAG = '__blob'
 const FORMAT = 'mec-lineup-backup'
-const VERSION = 2
+const VERSION = 3
 
 const TABLES = ['maps', 'agents', 'abilities', 'spots', 'lineups', 'settings'] as const
 type TableName = (typeof TABLES)[number]
@@ -86,5 +86,7 @@ export async function importBackup(file: BackupFile, database: LineupDB = defaul
     // backup da v1 não tinha agentes: aplica a mesma migração do banco
     if (file.version < 2) await migrateToAgents((n) => database.table(n))
     await fillShapes((n) => database.table(n))
+    // v3: "onde cai" passou do ponto pra posição
+    if (file.version < 3) await moveResultToLineups((n) => database.table(n))
   })
 }

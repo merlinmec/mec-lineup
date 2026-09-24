@@ -1,4 +1,4 @@
-import { Crosshair, Footprints, ImageOff, MousePointerClick } from 'lucide-react'
+import { Crosshair, Footprints, ImageOff, MapPin, MousePointerClick } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import type { Lineup } from '../../db/types'
@@ -55,14 +55,6 @@ export function LineupPreview({ lineup, color }: { lineup: Lineup; color: string
         <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-bg/85 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
           <Crosshair size={11} style={{ color }} /> Mira
         </span>
-        {lineup.positionImage && (
-          <div className="absolute bottom-2 right-2 w-[34%] overflow-hidden rounded-md border-2 border-bg shadow-lg">
-            <Img source={lineup.positionImage} alt="Posição" className="aspect-video w-full object-cover" />
-            <span className="absolute left-1 top-1 flex items-center gap-1 rounded bg-bg/85 px-1 py-px text-[9px] font-bold uppercase tracking-wider">
-              <Footprints size={9} /> Posição
-            </span>
-          </div>
-        )}
       </div>
       {lineup.aimImage && first && (
         // a referência ampliada: no preview pequeno o detalhe some sem isso
@@ -78,6 +70,12 @@ export function LineupPreview({ lineup, color }: { lineup: Lineup; color: string
           </div>
         </div>
       )}
+      {(lineup.positionImage || lineup.resultImage) && (
+        <div className="grid grid-cols-2 gap-2 border-b border-line px-3 py-2.5">
+          {lineup.positionImage && <Thumb image={lineup.positionImage} label="Onde eu fico" icon={<Footprints size={9} />} />}
+          {lineup.resultImage && <Thumb image={lineup.resultImage} label="Onde cai" icon={<MapPin size={9} />} />}
+        </div>
+      )}
       <div className="px-3.5 py-3">
         <div className="flex items-center gap-2">
           <p className="font-display min-w-0 flex-1 truncate text-lg font-semibold leading-tight">{lineup.title}</p>
@@ -91,5 +89,16 @@ export function LineupPreview({ lineup, color }: { lineup: Lineup; color: string
         <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-wider text-faint">Clique para fixar e ampliar</p>
       </div>
     </PreviewCard>
+  )
+}
+
+function Thumb({ image, label, icon }: { image: Blob; label: string; icon: ReactNode }) {
+  return (
+    <div className="relative overflow-hidden rounded-md border border-line">
+      <Img source={image} alt={label} className="aspect-video w-full object-cover" />
+      <span className="absolute left-1 top-1 flex items-center gap-1 rounded bg-bg/85 px-1 py-px text-[9px] font-bold uppercase tracking-wider">
+        {icon} {label}
+      </span>
+    </div>
   )
 }

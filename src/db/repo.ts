@@ -116,8 +116,13 @@ export const spotsRepo = {
 export const lineupsRepo = {
   async create(data: Pick<Lineup, 'spotId' | 'x' | 'y'>, side: Side = 'ambos') {
     const count = await db.lineups.where('spotId').equals(data.spotId).count()
+    // print de "onde cai" que ficou no ponto (dados de antes da v7) passa pra cá
+    const spot = await db.spots.get(data.spotId)
+    const inherited = spot?.resultImage ? { resultImage: spot.resultImage, resultMarks: spot.resultMarks ?? [] } : {}
+    if (spot?.resultImage) await db.spots.update(spot.id, { resultImage: undefined, resultMarks: undefined })
     const lineup: Lineup = {
       ...data,
+      ...inherited,
       id: newId(),
       title: `Posição ${count + 1}`,
       notes: '',

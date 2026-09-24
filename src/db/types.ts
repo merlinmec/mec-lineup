@@ -89,7 +89,10 @@ export interface Spot {
   r?: number
   /** Abertura do cone, em graus. */
   angle?: number
-  /** Print de como o efeito fica em jogo (a parede erguida, a ult caindo). */
+  /**
+   * Legado (antes da v7 o print de "onde cai" era do ponto). A v7 copia pras
+   * posições; o que sobrar aqui é herdado pela próxima posição criada.
+   */
   resultImage?: Blob
   resultMarks?: Mark[]
   createdAt: number
@@ -133,6 +136,9 @@ export interface Lineup {
   /** Print da posição exata em que ficar. */
   positionImage?: Blob
   positionMarks?: Mark[]
+  /** Print de onde a habilidade caiu / como ficou (cada lineup cai num lugar). */
+  resultImage?: Blob
+  resultMarks?: Mark[]
   createdAt: number
 }
 

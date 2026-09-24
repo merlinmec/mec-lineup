@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, Crosshair, Eye, Footprints, ImageOff, MapPin, MousePointerClick, Plus, Target, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Crosshair, Footprints, ImageOff, MapPin, MousePointerClick, Plus, Target, Trash2, X } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { lineupsRepo, spotsRepo } from '../../db/repo'
@@ -104,9 +104,12 @@ export function LineupDetail({ lineup, siblings, spot, ability, onNavigate, onCl
         }
       />
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        <Shot label="Onde mirar" icon={<Crosshair size={12} />} color={ability.color} image={lineup.aimImage} marks={lineup.aimMarks} onZoom={() => setZoomed('aim')} />
+        <Shot label="Pixel · onde mirar" icon={<Crosshair size={12} />} color={ability.color} image={lineup.aimImage} marks={lineup.aimMarks} onZoom={() => setZoomed('aim')} />
         {lineup.positionImage && (
-          <Shot label="Onde ficar" icon={<Footprints size={12} />} color={ability.color} image={lineup.positionImage} marks={lineup.positionMarks} onZoom={() => setZoomed('position')} />
+          <Shot label="Onde eu fico" icon={<Footprints size={12} />} color={ability.color} image={lineup.positionImage} marks={lineup.positionMarks} onZoom={() => setZoomed('position')} />
+        )}
+        {lineup.resultImage && (
+          <Shot label="Onde cai" icon={<MapPin size={12} />} color={ability.color} image={lineup.resultImage} marks={lineup.resultMarks} onZoom={() => setZoomed('result')} />
         )}
         <div className="flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-1.5 rounded-md border border-line bg-bg-2 px-2.5 py-1.5 text-sm">
@@ -116,15 +119,10 @@ export function LineupDetail({ lineup, siblings, spot, ability, onNavigate, onCl
           <SideBadge side={lineup.side} />
         </div>
         {lineup.notes && <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted">{lineup.notes}</p>}
-        {spot.resultImage && (
-          <div className="border-t border-line pt-4">
-            <Shot label="Como fica em jogo" icon={<Eye size={12} />} color={ability.color} image={spot.resultImage} marks={spot.resultMarks} onZoom={() => setZoomed('result')} />
-          </div>
-        )}
       </div>
       <Lightbox
-        image={zoomed === 'aim' ? lineup.aimImage : zoomed === 'position' ? lineup.positionImage : zoomed === 'result' ? spot.resultImage : undefined}
-        marks={zoomed === 'aim' ? lineup.aimMarks : zoomed === 'position' ? lineup.positionMarks : spot.resultMarks}
+        image={zoomed === 'aim' ? lineup.aimImage : zoomed === 'position' ? lineup.positionImage : zoomed === 'result' ? lineup.resultImage : undefined}
+        marks={zoomed === 'aim' ? lineup.aimMarks : zoomed === 'position' ? lineup.positionMarks : lineup.resultMarks}
         alt={lineup.title}
         onClose={() => setZoomed(undefined)}
       />
@@ -184,7 +182,6 @@ interface SpotEditorProps {
 
 export function SpotEditor({ spot, ability, abilities, lineups, onSelectLineup, onClose }: SpotEditorProps) {
   const confirm = useConfirm()
-  const [marking, setMarking] = useState(false)
   const shape = ability.shape ?? 'ponto'
   const remove = async () => {
     const ok = await confirm({
@@ -230,28 +227,6 @@ export function SpotEditor({ spot, ability, abilities, lineups, onSelectLineup, 
             />
           </div>
         )}
-        <ImageDrop
-          label="Como fica em jogo (opcional)"
-          hint="Print do efeito: a parede erguida, a ult caindo"
-          value={spot.resultImage}
-          onChange={(resultImage) => {
-            spotsRepo.update(spot.id, { resultImage, resultMarks: [] })
-            if (resultImage) setMarking(true)
-          }}
-          renderImage={() => <AnnotatedImage image={spot.resultImage} marks={spot.resultMarks ?? []} className="max-h-full w-full" />}
-          footer={
-            spot.resultImage && (
-              <button
-                type="button"
-                onClick={() => setMarking(true)}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-line py-2 text-xs font-semibold text-muted transition-colors hover:border-line-2 hover:text-text"
-              >
-                <Target size={14} />
-                {spot.resultMarks?.length ? `Editar marcações (${spot.resultMarks.length})` : 'Marcar detalhes (opcional)'}
-              </button>
-            )
-          }
-        />
         <div>
           <span className="label">Habilidade</span>
           <div className="grid grid-cols-4 gap-1.5">
@@ -285,12 +260,16 @@ export function SpotEditor({ spot, ability, abilities, lineups, onSelectLineup, 
                     onClick={() => onSelectLineup(l.id)}
                     className="flex w-full items-center gap-3 rounded-lg border border-line bg-bg-2 p-2 text-left transition-colors hover:border-line-2 hover:bg-panel-2"
                   >
-                    <div className="aspect-video w-16 shrink-0 overflow-hidden rounded bg-panel-3">
-                      <Img source={l.aimImage} alt="" className="size-full object-cover" />
+                    <div className="grid aspect-video w-16 shrink-0 place-items-center overflow-hidden rounded bg-panel-3">
+                      <Img source={l.aimImage} alt="" className="size-full object-cover" fallback={<AlertTriangle size={14} className="text-[#ffb547]" />} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{l.title}</p>
-                      <p className="truncate text-xs text-muted">{l.throwType}</p>
+                      {l.aimImage ? (
+                        <p className="truncate text-xs text-muted">{l.throwType}</p>
+                      ) : (
+                        <p className="truncate text-xs font-medium text-[#ffb547]">Falta o print do pixel</p>
+                      )}
                     </div>
                     <ChevronRight size={16} className="text-faint" />
                   </button>
@@ -305,16 +284,6 @@ export function SpotEditor({ spot, ability, abilities, lineups, onSelectLineup, 
           Excluir ponto
         </Button>
       </footer>
-      <MarkEditor
-        open={marking}
-        title="Marcar · como fica em jogo"
-        image={spot.resultImage}
-        marks={spot.resultMarks ?? []}
-        onClose={(resultMarks) => {
-          spotsRepo.update(spot.id, { resultMarks })
-          setMarking(false)
-        }}
-      />
     </Drawer>
   )
 }
@@ -332,7 +301,7 @@ interface LineupEditorProps {
 
 export function LineupEditor({ lineup, spot, ability, onBack, onClose }: LineupEditorProps) {
   const confirm = useConfirm()
-  const [marking, setMarking] = useState<'aim' | 'position'>()
+  const [marking, setMarking] = useState<Shot3>()
   const update = (changes: Partial<Lineup>) => lineupsRepo.update(lineup.id, changes)
   const remove = async () => {
     if (await confirm({ title: `Excluir ${lineup.title}?`, message: 'A posição e os prints dela serão apagados.' })) {
@@ -350,8 +319,9 @@ export function LineupEditor({ lineup, spot, ability, onBack, onClose }: LineupE
           <CommitInput id="lu-title" value={lineup.title} onCommit={(title) => update({ title })} placeholder="Ex: Canto do spawn" />
         </div>
         <ShotField
-          label="Print de onde mirar"
+          label="1 · Print do pixel (onde mirar) *"
           hint="Win+Shift+S no jogo, depois Ctrl+V aqui"
+          required
           image={lineup.aimImage}
           marks={lineup.aimMarks}
           onImage={(aimImage) => {
@@ -362,12 +332,20 @@ export function LineupEditor({ lineup, spot, ability, onBack, onClose }: LineupE
           onMark={() => setMarking('aim')}
         />
         <ShotField
-          label="Print da posição (opcional)"
+          label="2 · Onde eu fico (opcional)"
           hint="Pra quando precisa estar num ponto exato"
           image={lineup.positionImage}
           marks={lineup.positionMarks}
           onImage={(positionImage) => update({ positionImage, positionMarks: [] })}
           onMark={() => setMarking('position')}
+        />
+        <ShotField
+          label="3 · Onde cai (opcional)"
+          hint="Print de onde a habilidade caiu no mapa"
+          image={lineup.resultImage}
+          marks={lineup.resultMarks}
+          onImage={(resultImage) => update({ resultImage, resultMarks: [] })}
+          onMark={() => setMarking('result')}
         />
         <div>
           <label className="label" htmlFor="lu-throw">Como lançar</label>
@@ -416,11 +394,11 @@ export function LineupEditor({ lineup, spot, ability, onBack, onClose }: LineupE
       </footer>
       <MarkEditor
         open={!!marking}
-        title={marking === 'position' ? 'Marcar referência · posição' : 'Marcar referência · mira'}
-        image={marking === 'position' ? lineup.positionImage : lineup.aimImage}
-        marks={(marking === 'position' ? lineup.positionMarks : lineup.aimMarks) ?? []}
+        title={`Marcar referência · ${marking ? SHOT_TITLE[marking] : ''}`}
+        image={marking && lineup[SHOT_FIELDS[marking].image]}
+        marks={(marking && lineup[SHOT_FIELDS[marking].marks]) ?? []}
         onClose={(marks) => {
-          update(marking === 'position' ? { positionMarks: marks } : { aimMarks: marks })
+          if (marking) update({ [SHOT_FIELDS[marking].marks]: marks })
           setMarking(undefined)
         }}
       />
@@ -428,8 +406,17 @@ export function LineupEditor({ lineup, spot, ability, onBack, onClose }: LineupE
   )
 }
 
-function ShotField({ label, hint, image, marks = [], onImage, onMark }: { label: string; hint: string; image?: Blob; marks?: Mark[]; onImage: (b: Blob | undefined) => void; onMark: () => void }) {
+type Shot3 = 'aim' | 'position' | 'result'
+const SHOT_FIELDS = {
+  aim: { image: 'aimImage', marks: 'aimMarks' },
+  position: { image: 'positionImage', marks: 'positionMarks' },
+  result: { image: 'resultImage', marks: 'resultMarks' },
+} as const
+const SHOT_TITLE: Record<Shot3, string> = { aim: 'pixel', position: 'onde eu fico', result: 'onde cai' }
+
+function ShotField({ label, hint, required, image, marks = [], onImage, onMark }: { label: string; hint: string; required?: boolean; image?: Blob; marks?: Mark[]; onImage: (b: Blob | undefined) => void; onMark: () => void }) {
   return (
+    <div className={cn(required && !image && 'rounded-xl ring-1 ring-[#ffb547]/50 ring-offset-4 ring-offset-panel')}>
     <ImageDrop
       label={label}
       hint={hint}
@@ -452,6 +439,8 @@ function ShotField({ label, hint, image, marks = [], onImage, onMark }: { label:
         )
       }
     />
+    {required && !image && <p className="mt-1.5 text-[11px] font-medium text-[#ffb547]">Obrigatório: sem ele a posição não serve pra consultar.</p>}
+    </div>
   )
 }
 

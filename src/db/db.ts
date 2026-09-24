@@ -38,6 +38,9 @@ export class LineupDB extends Dexie {
     this.version(6)
       .stores({})
       .upgrade((tx) => fillShapes((n) => tx.table(n)))
+    this.version(7)
+      .stores({})
+      .upgrade((tx) => moveResultToLineups((n) => tx.table(n)))
   }
 }
 
@@ -79,6 +82,25 @@ export async function fillShapes(table: (name: string) => Table) {
     if (a.shape === 'cone' && defaultShape(a.id) === 'faixa') a.shape = 'faixa'
     a.size ??= defaultSize(a.id)
   })
+}
+
+/**
+ * v7: o print de "onde cai" era do ponto, mas cada lineup cai num lugar um
+ * pouco diferente. Copia pras posições do ponto (sem sobrescrever) e tira do
+ * ponto; ponto sem posição mantém, e a primeira posição criada herda.
+ */
+export async function moveResultToLineups(table: (name: string) => Table) {
+  const spots = (await table('spots').toArray()) as Spot[]
+  for (const spot of spots.filter((s) => s.resultImage)) {
+    const lineups = table('lineups').where('spotId').equals(spot.id)
+    if ((await lineups.count()) === 0) continue
+    await lineups.modify((l: Lineup) => {
+      if (l.resultImage) return
+      l.resultImage = spot.resultImage
+      l.resultMarks = spot.resultMarks ?? []
+    })
+    await table('spots').update(spot.id, { resultImage: undefined, resultMarks: undefined })
+  }
 }
 
 export const db = new LineupDB()

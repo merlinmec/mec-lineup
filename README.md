@@ -16,9 +16,12 @@ servidor na nuvem.
 - **Minimapa tático** com zoom e arraste. Cada habilidade tem pontos onde ela
   cai, e cada ponto tem as **posições de lançamento** (o retrato do agente no
   mapa, ligado ao ponto por uma linha).
-- **Preview no hover**: passar o mouse numa posição mostra o print de onde
-  mirar, como lançar (clique, pulo + clique...) e o lado. Clicando, fica fixo
-  num painel maior, com ← → pra trocar de posição.
+- **Três prints por posição**: o **pixel** (onde mirar, obrigatório), **onde
+  eu fico** (quando precisa estar num ponto exato) e **onde cai** (onde a
+  habilidade caiu no mapa). Posição sem o pixel ganha um alerta no modo edição.
+- **Preview no hover**: passar o mouse numa posição mostra o pixel, os outros
+  dois prints, como lançar (clique, pulo + clique...) e o lado. Clicando, fica
+  fixo num painel maior, com ← → pra trocar de posição.
 - **Ponto de referência marcado no print**: círculo ou seta com uma nota
   ("fresta da barra de vida no tijolo"), e uma **lupa automática** que amplia
   esse detalhe, porque num preview pequeno ele some.
@@ -26,7 +29,6 @@ servidor na nuvem.
   (parede da Viper, ult do Sova), área (ults da Viper, do Brimstone, do KAY/O)
   e faixa (ult da Fade), desenhadas na escala de cada mapa. O que é fixo no jogo
   fica travado: o feixe do Sova sempre tem 66 m e só gira.
-- **Print de "como fica em jogo"** por ponto (a parede erguida, a ult caindo).
 - **Filtro de ataque/defesa**, lembrado entre mapas.
 - **Agentes**: Viper, Sova, Brimstone, KAY/O e Fade já vêm prontos, com os
   ícones oficiais; qualquer outro agente pode ser adicionado, e ícones, nomes,
@@ -51,9 +53,10 @@ clique no ponto → passe o mouse nas posições.
 1. Clique no minimapa pra marcar onde a habilidade cai (ou a origem da
    parede/ult). Arraste o ícone e as alças brancas pra ajustar.
 2. Com o ponto selecionado, cada clique no mapa cria uma posição de lançamento.
-3. No painel da posição, cole o print de onde mirar: **Win+Shift+S** no jogo e
+3. No painel da posição, cole o **print do pixel**: **Win+Shift+S** no jogo e
    **Ctrl+V** com o mouse em cima do campo. O editor de marcação abre sozinho
-   pra você circular a referência.
+   pra você circular a referência. Se quiser, cole também **onde você fica** e
+   **onde a habilidade cai**.
 
 | Atalho | Ação |
 |---|---|
@@ -157,7 +160,7 @@ scripts/          # inicialização em segundo plano no Windows
   usuário escolher, e essa permissão expira. O servidor do Vite pode. A rota
   exige um cabeçalho próprio, o que força o preflight de CORS: outro site
   aberto no navegador não consegue sobrescrever o backup.
-- **Migrações do banco** (Dexie, hoje na v6) nunca perdem dados: cada versão
+- **Migrações do banco** (Dexie, hoje na v7) nunca perdem dados: cada versão
   converte o que já existe, e backups antigos importados passam pela mesma
   conversão. Tudo isso tem teste.
 
