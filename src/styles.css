@@ -23,6 +23,8 @@
   --color-accent: #34e3b0;
   --color-accent-2: #1fb892;
   --color-danger: #ff4655;
+  /* azul do lado defensor; o teal fica só pra identidade do app */
+  --color-defesa: #4ea8ff;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);

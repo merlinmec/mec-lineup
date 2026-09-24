@@ -9,7 +9,7 @@ export function SideBadge({ side }: { side: Side }) {
     <span
       className={cn(
         'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-        side === 'ataque' ? 'bg-danger/15 text-[#ff7a85]' : 'bg-accent/15 text-accent',
+        side === 'ataque' ? 'bg-danger/15 text-[#ff7a85]' : 'bg-defesa/15 text-defesa',
       )}
     >
       {SIDE_LABEL[side]}

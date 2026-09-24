@@ -542,7 +542,7 @@ interface TopBarProps {
 const SIDE_OPTIONS: { value: SideFilter; label: string; icon: ReactNode; active: string }[] = [
   { value: 'todos', label: 'Todos', icon: null, active: 'bg-panel-3 text-text' },
   { value: 'ataque', label: 'Ataque', icon: <Swords size={13} />, active: 'bg-danger/20 text-[#ff7a85]' },
-  { value: 'defesa', label: 'Defesa', icon: <Shield size={13} />, active: 'bg-accent/15 text-accent' },
+  { value: 'defesa', label: 'Defesa', icon: <Shield size={13} />, active: 'bg-defesa/15 text-defesa' },
 ]
 
 function StageTopBar({ editing, ability, spot, hasSpots, lineupCount, sideFilter, onSideFilter, tactical, onToggleStyle }: TopBarProps) {
