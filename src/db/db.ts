@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable, type Table } from 'dexie'
-import { agentIconUrl, DEFAULT_AGENTS, defaultShape, VIPER_ID } from '../lib/valorantApi'
+import { agentIconUrl, DEFAULT_AGENTS, defaultShape, defaultSize, VIPER_ID } from '../lib/valorantApi'
 import type { Ability, Agent, CachedImage, GameMap, ImageSource, Lineup, LocalEntry, Settings, Spot } from './types'
 
 export class LineupDB extends Dexie {
@@ -35,6 +35,9 @@ export class LineupDB extends Dexie {
       .upgrade((tx) => fillShapes((n) => tx.table(n)))
     // lado por ponto sem carregar os prints: o filtro lê só as chaves desse índice
     this.version(5).stores({ lineups: 'id, spotId, [spotId+side]' })
+    this.version(6)
+      .stores({})
+      .upgrade((tx) => fillShapes((n) => tx.table(n)))
   }
 }
 
@@ -72,6 +75,9 @@ export async function migrateToAgents(table: (name: string) => Table) {
 export async function fillShapes(table: (name: string) => Table) {
   await table('abilities').toCollection().modify((a: Ability) => {
     a.shape ??= defaultShape(a.id)
+    // v6: ult da Fade era cone por engano; é uma faixa retangular
+    if (a.shape === 'cone' && defaultShape(a.id) === 'faixa') a.shape = 'faixa'
+    a.size ??= defaultSize(a.id)
   })
 }
 

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { exportBackup, importBackup, isBackupFile } from '../lib/backup'
 import Dexie from 'dexie'
 import { toGameMaps, VIPER_ID, type ApiMap } from '../lib/valorantApi'
-import { LineupDB } from './db'
-import { ensureSeeded } from './seed'
+import { fillShapes, LineupDB } from './db'
+import { ensureSeeded, fillMapScales } from './seed'
 
 let n = 0
 let database: LineupDB
@@ -134,5 +134,35 @@ describe('backup', () => {
     await importBackup(file as never, database)
     expect((await database.abilities.get('veneno'))?.agentId).toBe(VIPER_ID)
     expect(await database.agents.count()).toBe(5)
+  })
+})
+
+describe('revisão das habilidades (v6)', () => {
+  const FADE_ULT = 'dade69b4-4f5a-8528-247b-219e5a1facd6:ultimate'
+
+  it('ult da Fade salva como cone vira faixa 40 × 20 m', async () => {
+    await database.abilities.put({ id: FADE_ULT, agentId: 'fade', name: 'Véu da Noite', shape: 'cone', key: 'X', color: '#fff', icon: {}, order: 3 })
+    await fillShapes((n) => database.table(n))
+    const a = await database.abilities.get(FADE_ULT)
+    expect(a?.shape).toBe('faixa')
+    expect(a?.size).toEqual({ length: 40, width: 20, fixed: true })
+  })
+
+  it('não desfaz medidas que o usuário editou', async () => {
+    await database.abilities.put({ id: 'orbe', agentId: VIPER_ID, name: 'Orbe', shape: 'ponto', size: { radius: 5 }, key: 'Q', color: '#fff', icon: {}, order: 1 })
+    await fillShapes((n) => database.table(n))
+    expect((await database.abilities.get('orbe'))?.size).toEqual({ radius: 5 })
+  })
+
+  it('agentes novos já vêm com as medidas da wiki oficial', async () => {
+    await ensureSeeded(database, async () => [])
+    expect((await database.abilities.get('ult'))?.size).toEqual({ radius: 9, fixed: true })
+    expect((await database.abilities.get('parede'))?.size).toEqual({ length: 60, width: 2 })
+  })
+
+  it('preenche a escala dos mapas antigos pela API', async () => {
+    await database.maps.put({ id: 'haven', name: 'Haven', cover: {}, minimap: {}, rotation: 0, order: 0, createdAt: 1 })
+    await fillMapScales(database, async () => ({ data: [{ uuid: 'haven', xMultiplier: 0.000075 } as never] }))
+    expect((await database.maps.get('haven'))?.scale).toBeCloseTo(0.0075)
   })
 })

@@ -14,7 +14,8 @@ import { ImageDrop } from '../../ui/ImageDrop'
 import { Img } from '../../ui/Img'
 import { Modal } from '../../ui/Modal'
 import { SHAPE_HINT, SHAPE_LABEL } from '../../lib/shapes'
-import type { Shape } from '../../db/types'
+import { defaultSize } from '../../lib/valorantApi'
+import type { AbilitySize, Shape } from '../../db/types'
 import { useToast } from '../../ui/Toast'
 
 const SWATCHES = ['#c6f432', '#34e3b0', '#3cc8f0', '#ff5470', '#ffb547', '#b58cff', '#ffffff']
@@ -176,7 +177,7 @@ function AgentEditor({ agent }: { agent: Agent }) {
               </div>
               <div>
                 <span className="label">Forma no mapa</span>
-                <div className="grid grid-cols-4 gap-1 rounded-lg border border-line bg-bg-2 p-0.5">
+                <div className="grid grid-cols-5 gap-1 rounded-lg border border-line bg-bg-2 p-0.5">
                   {SHAPES.map((sh) => (
                     <button
                       key={sh}
@@ -194,6 +195,7 @@ function AgentEditor({ agent }: { agent: Agent }) {
                   ))}
                 </div>
               </div>
+              <SizeFields ability={a} />
               <div>
                 <span className="label">Cor</span>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -288,7 +290,7 @@ function AddAgentDialog({ open, existing, onClose, onAdded }: { open: boolean; e
   )
 }
 
-const SHAPES: Shape[] = ['ponto', 'linha', 'area', 'cone']
+const SHAPES: Shape[] = ['ponto', 'linha', 'area', 'faixa', 'cone']
 
 /** Miniatura de cada forma, no mesmo desenho do minimapa. */
 function ShapeIcon({ shape, color }: { shape: Shape; color: string }) {
@@ -297,7 +299,71 @@ function ShapeIcon({ shape, color }: { shape: Shape; color: string }) {
       {shape === 'ponto' && <circle cx="10" cy="7" r="3" fill={color} />}
       {shape === 'linha' && <line x1="2" y1="11" x2="18" y2="3" stroke={color} strokeWidth="2.5" strokeLinecap="round" />}
       {shape === 'area' && <circle cx="10" cy="7" r="5.5" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1.5" />}
+      {shape === 'faixa' && <rect x="3" y="3.5" width="14" height="7" rx="1" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1.5" />}
       {shape === 'cone' && <path d="M3 7 L17 1.5 A8 8 0 0 1 17 12.5 Z" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />}
     </svg>
+  )
+}
+
+/** Quais medidas fazem sentido pra cada forma. */
+const SIZE_FIELDS: Record<Shape, { key: 'radius' | 'length' | 'width'; label: string }[]> = {
+  ponto: [{ key: 'radius', label: 'Raio da zona' }],
+  area: [{ key: 'radius', label: 'Raio' }],
+  linha: [
+    { key: 'length', label: 'Comprimento' },
+    { key: 'width', label: 'Largura' },
+  ],
+  faixa: [
+    { key: 'length', label: 'Comprimento' },
+    { key: 'width', label: 'Largura' },
+  ],
+  cone: [{ key: 'length', label: 'Alcance' }],
+}
+
+/**
+ * Medidas reais em metros (vêm da wiki oficial pros agentes padrão). Ficam
+ * editáveis pra acompanhar patches e pra agentes adicionados depois.
+ */
+function SizeFields({ ability }: { ability: Ability }) {
+  const shape = ability.shape ?? 'ponto'
+  const size = ability.size ?? {}
+  const fields = SIZE_FIELDS[shape]
+  const original = defaultSize(ability.id)
+  const set = (changes: Partial<AbilitySize>) => abilitiesRepo.update(ability.id, { size: { ...size, ...changes } })
+  const canFix = shape !== 'ponto'
+
+  return (
+    <div>
+      <span className="label">
+        Tamanho no jogo (metros)
+        {original && JSON.stringify(original) !== JSON.stringify(ability.size) && (
+          <button type="button" onClick={() => abilitiesRepo.update(ability.id, { size: original })} className="ml-2 normal-case tracking-normal text-accent hover:underline">
+            restaurar
+          </button>
+        )}
+      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        {fields.map((f) => (
+          <label key={f.key} className="flex items-center gap-1.5 text-[11px] text-muted">
+            {f.label}
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={size[f.key] ?? ''}
+              placeholder="—"
+              onChange={(e) => set({ [f.key]: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+              className="field !w-16 !px-2 !py-1 text-center !text-xs"
+            />
+          </label>
+        ))}
+        {canFix && (
+          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted" title="No jogo o tamanho não muda: só posição e direção">
+            <input type="checkbox" checked={!!size.fixed} onChange={(e) => set({ fixed: e.target.checked })} style={{ accentColor: ability.color }} />
+            fixo
+          </label>
+        )}
+      </div>
+    </div>
   )
 }

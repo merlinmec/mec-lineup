@@ -13,7 +13,7 @@ import { Lightbox } from '../../ui/Lightbox'
 import { AnnotatedImage, ZoomLens } from '../../ui/annotated'
 import { MarkEditor } from './MarkEditor'
 import { SIDE_LABEL, SideBadge } from './SideBadge'
-import { DEFAULT_ANGLE, SHAPE_LABEL } from '../../lib/shapes'
+import { DEFAULT_ANGLE, shapeHelp } from '../../lib/shapes'
 
 function Drawer({ children }: { children: ReactNode }) {
   return (
@@ -205,9 +205,8 @@ export function SpotEditor({ spot, ability, abilities, lineups, onSelectLineup, 
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         <Hint>
           Clique no minimapa para adicionar uma <b className="text-text">posição de lançamento</b> para este ponto.
-          {shape === 'ponto'
-            ? ' Arraste os marcadores para ajustar.'
-            : ` Arraste o ícone para mover a ${SHAPE_LABEL[shape].toLowerCase()} e as alças brancas para ajustar ${shape === 'area' ? 'o raio' : shape === 'cone' ? 'a direção e o alcance' : 'as pontas'}.`}
+          {' '}
+          {shapeHelp(shape, ability.size)}
         </Hint>
         <div>
           <label className="label" htmlFor="spot-name">Nome do ponto</label>

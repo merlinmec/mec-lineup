@@ -15,7 +15,7 @@ import { Img } from '../../ui/Img'
 import { LineupPreview } from './LineupPreview'
 import { LineupLinks, LineupMarker, ShapeHandle, SpotMarker, SpotShape } from './markers'
 import { ResultDock, SpotResultPreview } from './SpotResult'
-import { geometryFor, iconAnchor, translate, withDefaults, type FullGeometry } from '../../lib/shapes'
+import { constrainEnd, geometryFor, iconAnchor, shapeSpec, translate, withDefaults, type FullGeometry, type ShapeSpec } from '../../lib/shapes'
 import { LineupDetail, LineupEditor, SpotEditor } from './panels'
 import { isTyping, Stage } from './Stage'
 
@@ -61,6 +61,8 @@ function MapView({ map }: { map: GameMap }) {
   // consulta: esconde ponto só do outro lado; edição: mostra tudo pra poder editar
   const abilitySpots = spots.filter((s) => s.abilityId === ability?.id && (editing || spotVisible(sideCounts.get(s.id))))
   const shape: Shape = ability?.shape ?? 'ponto'
+  // medidas reais da habilidade convertidas pela escala deste mapa
+  const spec = useMemo(() => shapeSpec(shape, ability?.size, map.scale), [shape, ability?.size, map.scale])
   const lineupCount = useMemo(() => new Map([...sideCounts].map(([id, c]) => [id, c.match])), [sideCounts])
 
   const setQuery = useCallback(
@@ -113,7 +115,7 @@ function MapView({ map }: { map: GameMap }) {
         const l = await lineupsRepo.create({ spotId: selectedSpot.id, ...p }, sideForNew(sideFilter))
         setLineupId(l.id)
       } else {
-        const s = await spotsRepo.create({ mapId: map.id, abilityId: ability.id, ...p }, shape)
+        const s = await spotsRepo.create({ mapId: map.id, abilityId: ability.id, ...p }, shape, spec)
         selectSpot(s.id)
       }
       return
@@ -145,7 +147,7 @@ function MapView({ map }: { map: GameMap }) {
   const tactical = (settings?.minimapStyle ?? 'tatico') === 'tatico'
   const playerIcon = agent?.icon ?? {}
   const livePoint = (id: string, p: Point) => (dragging?.id === id ? dragging.p : p)
-  const storedGeom = (sp: Spot) => withDefaults(sp, shape)
+  const storedGeom = (sp: Spot) => withDefaults(sp, shape, spec)
   const liveGeom = (sp: Spot) => (shapeDrag?.id === sp.id ? shapeDrag.g : storedGeom(sp))
   const anchorOf = (sp: Spot) => iconAnchor(liveGeom(sp), shape)
   const saveGeom = (id: string, g: FullGeometry) => spotsRepo.update(id, geometryFor(g, shape))
@@ -219,6 +221,7 @@ function MapView({ map }: { map: GameMap }) {
                       <SpotShape
                         key={`shape-${sp.id}`}
                         shape={shape}
+                        spec={spec}
                         g={liveGeom(sp)}
                         color={ability.color}
                         state={spotState(sp.id)}
@@ -267,6 +270,7 @@ function MapView({ map }: { map: GameMap }) {
                         key={`handles-${selectedSpot.id}`}
                         spot={selectedSpot}
                         shape={shape}
+                        spec={spec}
                         base={storedGeom(selectedSpot)}
                         onDrag={(g) => setShapeDrag(g ? { id: selectedSpot.id, g } : null)}
                         onSave={(g) => saveGeom(selectedSpot.id, g)}
@@ -636,19 +640,32 @@ function writeLastAgent(id: string) {
   }
 }
 
-/** Alças de ajuste da forma selecionada: pontas da linha, raio da área, alcance do cone. */
-function ShapeHandles({ spot, shape, base, onDrag, onSave }: { spot: Spot; shape: Shape; base: FullGeometry; onDrag: (g: FullGeometry | null) => void; onSave: (g: FullGeometry) => void }) {
+/**
+ * Alças de ajuste da forma selecionada. Respeitam o tamanho real: raio fixo
+ * não tem alça, feixe/faixa de tamanho fixo só giram, parede tem comprimento máximo.
+ */
+function ShapeHandles({ spot, shape, spec, base, onDrag, onSave }: { spot: Spot; shape: Shape; spec: ShapeSpec; base: FullGeometry; onDrag: (g: FullGeometry | null) => void; onSave: (g: FullGeometry) => void }) {
   if (shape === 'ponto') return null
   const handle = (key: string, label: string, at: Point, apply: (p: Point) => FullGeometry) => (
     <ShapeHandle key={`${spot.id}-${key}`} point={at} label={label} onDrag={(p) => onDrag(p ? apply(p) : null)} onDragEnd={(p) => onSave(apply(p))} />
   )
   if (shape === 'area') {
+    if (spec.fixed) return null
     return handle('raio', 'Raio da área', { x: Math.min(1, base.x + base.r), y: base.y }, (p) => ({ ...base, r: Math.max(0.008, Math.hypot(p.x - base.x, p.y - base.y)) }))
   }
+  const endFrom = (start: Point, target: Point) => constrainEnd(start, target, shape, spec)
+  const endLabel = shape === 'cone' ? 'Direção e alcance do cone' : spec.fixed ? 'Direção' : 'Fim da linha'
   return (
     <>
-      {shape === 'linha' && handle('inicio', 'Início da linha', { x: base.x, y: base.y }, (p) => ({ ...base, x: p.x, y: p.y }))}
-      {handle('fim', shape === 'cone' ? 'Direção e alcance do cone' : 'Fim da linha', { x: base.x2, y: base.y2 }, (p) => ({ ...base, x2: p.x, y2: p.y }))}
+      {shape === 'linha' &&
+        handle('inicio', 'Início da linha', { x: base.x, y: base.y }, (p) => {
+          const end = endFrom(p, { x: base.x2, y: base.y2 })
+          return { ...base, x: p.x, y: p.y, x2: end.x, y2: end.y }
+        })}
+      {handle('fim', endLabel, { x: base.x2, y: base.y2 }, (p) => {
+        const end = endFrom({ x: base.x, y: base.y }, p)
+        return { ...base, x2: end.x, y2: end.y }
+      })}
     </>
   )
 }

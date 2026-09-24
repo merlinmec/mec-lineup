@@ -2,7 +2,7 @@ import { motion } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Ability, ImageSource, Shape } from '../../db/types'
 import { toScreen, type Point } from '../../lib/geometry'
-import { conePolygon, type FullGeometry } from '../../lib/shapes'
+import { bandPolygon, conePolygon, type FullGeometry, type ShapeSpec } from '../../lib/shapes'
 import { cn } from '../../ui/cn'
 import { Img } from '../../ui/Img'
 import { useStage } from './Stage'
@@ -257,6 +257,7 @@ export function ShapeHandle({ point, label, onDrag, onDragEnd }: { point: Point;
 
 interface SpotShapeProps {
   shape: Shape
+  spec: ShapeSpec
   g: FullGeometry
   color: string
   state: 'normal' | 'selecionado' | 'apagado' | 'destacado'
@@ -264,12 +265,12 @@ interface SpotShapeProps {
 }
 
 /**
- * O efeito desenhado no minimapa, como fica em jogo: a parede como faixa,
- * a ult como área, o cone da Fade aberto. Ponto não desenha nada extra.
+ * O efeito desenhado no minimapa no tamanho real do jogo: a zona do molotov
+ * em volta do ponto, a parede e o feixe como linhas, as ults como área ou faixa.
  */
-export function SpotShape({ shape, g, color, state, onClick }: SpotShapeProps) {
+export function SpotShape({ shape, spec, g, color, state, onClick }: SpotShapeProps) {
   const { rotation } = useStage()
-  if (shape === 'ponto') return null
+  if (shape === 'ponto' && !spec.zone) return null
   const a = toScreen({ x: g.x, y: g.y }, rotation)
   const b = toScreen({ x: g.x2, y: g.y2 }, rotation)
   const selected = state === 'selecionado'
@@ -284,6 +285,15 @@ export function SpotShape({ shape, g, color, state, onClick }: SpotShapeProps) {
     },
   }
 
+  // zona do ponto: só contexto, não captura clique (o ícone é que seleciona)
+  if (shape === 'ponto') {
+    return (
+      <motion.svg className="pointer-events-none absolute inset-0 size-full overflow-visible" viewBox="0 0 1 1" preserveAspectRatio="none" initial={{ opacity: 0 }} animate={{ opacity }} exit={{ opacity: 0 }}>
+        <circle cx={a.x} cy={a.y} r={spec.zone} fill={color} fillOpacity={selected ? 0.2 : 0.1} stroke={color} strokeOpacity={0.55} strokeWidth={1.2} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+      </motion.svg>
+    )
+  }
+
   return (
     <motion.svg
       className="pointer-events-none absolute inset-0 size-full overflow-visible"
@@ -296,9 +306,26 @@ export function SpotShape({ shape, g, color, state, onClick }: SpotShapeProps) {
     >
       {shape === 'linha' && (
         <g {...common}>
-          {/* brilho largo + faixa: lembra a parede tóxica vista de cima */}
-          <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeOpacity={0.22} strokeWidth={selected ? 16 : 13} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-          <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={selected ? 5 : 4} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          {/* largura real (acompanha o zoom) + núcleo fino sempre visível */}
+          <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeOpacity={selected ? 0.35 : 0.25} strokeWidth={spec.width} strokeLinecap="round" />
+          <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={selected ? 3.5 : 2.5} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </g>
+      )}
+      {shape === 'faixa' && (
+        <g {...common}>
+          <polygon
+            points={bandPolygon(a, b, spec.width)
+              .map((p) => `${p.x},${p.y}`)
+              .join(' ')}
+            fill={color}
+            fillOpacity={fill}
+            stroke={color}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          {/* seta no eixo: a onda avança nessa direção */}
+          <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray="6 5" vectorEffect="non-scaling-stroke" />
         </g>
       )}
       {shape === 'area' && (

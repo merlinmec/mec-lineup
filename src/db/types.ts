@@ -18,6 +18,11 @@ export interface GameMap {
   minimap: ImageSource
   /** Alguns mapas aparecem girados no minimapa do jogo. */
   rotation: Rotation
+  /**
+   * Quanto 1 metro do jogo ocupa no minimapa (fração do lado). Vem da
+   * valorant-api (xMultiplier × 100); sem ele, formas usam uma escala média.
+   */
+  scale?: number
   order: number
   createdAt: number
 }
@@ -31,11 +36,25 @@ export interface Agent {
 }
 
 /**
- * Como a habilidade aparece no minimapa: ponto de impacto (orbe, veneno),
- * linha de X a Y (parede da Viper, ult do Sova), área circular (ult da Viper
- * ou do Brimstone) ou cone (ult da Fade).
+ * Como a habilidade aparece no minimapa: ponto de impacto com zona (orbe,
+ * veneno), linha (parede da Viper, ult do Sova), área circular (ults da Viper,
+ * do Brimstone e do KAY/O), faixa retangular (ult da Fade) ou cone.
  */
-export type Shape = 'ponto' | 'linha' | 'area' | 'cone'
+export type Shape = 'ponto' | 'linha' | 'area' | 'faixa' | 'cone'
+
+/**
+ * Medidas reais da habilidade, em metros (wiki oficial da Riot). `fixed`
+ * trava o tamanho: no jogo o feixe do Sova sempre tem 66 m e a ult do
+ * Brimstone sempre 9 m de raio; só posição/direção mudam.
+ */
+export interface AbilitySize {
+  /** Raio da área, ou da zona de efeito de um ponto. */
+  radius?: number
+  /** Comprimento (máximo, se não for fixo) da linha/faixa/cone. */
+  length?: number
+  width?: number
+  fixed?: boolean
+}
 
 export interface Ability {
   id: string
@@ -43,6 +62,7 @@ export interface Ability {
   name: string
   /** Ausente em dados antigos = 'ponto'. */
   shape?: Shape
+  size?: AbilitySize
   /** Tecla no jogo (C, Q, E, X), só informativa. */
   key: string
   color: string

@@ -1,6 +1,6 @@
 import type { Table } from 'dexie'
 import { db } from './db'
-import { geometryFor, withDefaults } from '../lib/shapes'
+import { geometryFor, shapeSpec, withDefaults, type ShapeSpec } from '../lib/shapes'
 import type { Ability, Agent, GameMap, Lineup, Shape, Side, Spot } from './types'
 
 const newId = () => crypto.randomUUID()
@@ -97,9 +97,9 @@ export const abilitiesRepo = {
 
 export const spotsRepo = {
   /** Já nasce com a geometria padrão da forma (linha com fim, área com raio...). */
-  async create(data: Pick<Spot, 'mapId' | 'abilityId' | 'x' | 'y'>, shape: Shape = 'ponto') {
+  async create(data: Pick<Spot, 'mapId' | 'abilityId' | 'x' | 'y'>, shape: Shape = 'ponto', spec: ShapeSpec = shapeSpec(shape, undefined)) {
     const count = await db.spots.where({ mapId: data.mapId, abilityId: data.abilityId }).count()
-    const geometry = geometryFor(withDefaults(data, shape), shape)
+    const geometry = geometryFor(withDefaults(data, shape, spec), shape)
     const spot: Spot = { ...data, ...geometry, id: newId(), name: `Ponto ${count + 1}`, createdAt: Date.now() }
     await db.spots.add(spot)
     return spot

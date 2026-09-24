@@ -1,4 +1,4 @@
-import type { Ability, Agent, GameMap, Shape } from '../db/types'
+import type { Ability, AbilitySize, Agent, GameMap, Shape } from '../db/types'
 
 const API = 'https://valorant-api.com/v1'
 const MEDIA = 'https://media.valorant-api.com/agents'
@@ -21,6 +21,8 @@ interface AgentSeed {
   ids?: Record<Slot, string>
   /** Formas diferentes de 'ponto'. */
   shapes?: Partial<Record<Slot, Shape>>
+  /** Medidas reais em metros (wiki.playvalorant.com). */
+  sizes?: Partial<Record<Slot, AbilitySize>>
 }
 
 /** Agentes de lineup que o app já traz prontos (nomes pt-BR da valorant-api). */
@@ -31,30 +33,56 @@ const SEEDS: AgentSeed[] = [
     abilities: { grenade: 'Veneno', ability1: 'Orbe', ability2: 'Parede', ultimate: 'Ult' },
     ids: { grenade: 'veneno', ability1: 'orbe', ability2: 'parede', ultimate: 'ult' },
     shapes: { ability2: 'linha', ultimate: 'area' },
+    sizes: {
+      grenade: { radius: 4.5 }, // zona ácida
+      ability1: { radius: 4.5 }, // nuvem
+      ability2: { length: 60, width: 2 }, // até 60 m, sai da Viper
+      ultimate: { radius: 9, fixed: true }, // em volta da Viper
+    },
   },
   {
     uuid: '320b2a48-4d9b-a075-30f1-1f93a9b638fa',
     name: 'Sova',
     abilities: { grenade: 'Drone Coruja', ability1: 'Flecha de Choque', ability2: 'Flecha Rastreadora', ultimate: 'Fúria do Caçador' },
     shapes: { ultimate: 'linha' },
+    sizes: {
+      ability1: { radius: 4 },
+      ultimate: { length: 66, width: 3.52, fixed: true }, // feixe atravessa paredes, só gira
+    },
   },
   {
     uuid: '9f0d8ba9-4140-b941-57d3-a7ad57c6b417',
     name: 'Brimstone',
     abilities: { grenade: 'Sinalizador Estimulante', ability1: 'Incendiário', ability2: 'Fumaça Celeste', ultimate: 'Ataque Orbital' },
     shapes: { ultimate: 'area' },
+    sizes: {
+      grenade: { radius: 6 },
+      ability1: { radius: 4.5 },
+      ability2: { radius: 4.15 },
+      ultimate: { radius: 9, fixed: true },
+    },
   },
   {
     uuid: '601dbbe7-43ce-be57-2a40-4abd24953621',
     name: 'KAY/O',
     abilities: { grenade: 'FRAG/mento', ability1: 'GRANADA/clarão', ability2: 'PONTO/zero', ultimate: 'ANULAR/cmd' },
     shapes: { ultimate: 'area' },
+    sizes: {
+      grenade: { radius: 4 },
+      ability2: { radius: 15 }, // raio de supressão
+      ultimate: { radius: 42.5, fixed: true }, // pulsos em volta do KAY/O
+    },
   },
   {
     uuid: 'dade69b4-4f5a-8528-247b-219e5a1facd6',
     name: 'Fade',
     abilities: { grenade: 'Espreitador', ability1: 'Clausura', ability2: 'Assombrar', ultimate: 'Véu da Noite' },
-    shapes: { ultimate: 'cone' },
+    // Véu da Noite é uma faixa de 40 × 20 m que avança, não um cone
+    shapes: { ultimate: 'faixa' },
+    sizes: {
+      ability1: { radius: 6.58 },
+      ultimate: { length: 40, width: 20, fixed: true },
+    },
   },
 ]
 
@@ -66,6 +94,7 @@ function build(seed: AgentSeed, order: number): { agent: Agent; abilities: Abili
       agentId: seed.uuid,
       name: seed.abilities[slot],
       shape: seed.shapes?.[slot] ?? 'ponto',
+      ...(seed.sizes?.[slot] ? { size: seed.sizes[slot] } : {}),
       key: SLOT_KEY[slot],
       color: PALETTE[i],
       icon: { url: abilityIconUrl(seed.uuid, slot) },
@@ -79,6 +108,10 @@ export const DEFAULT_AGENTS = SEEDS.map(build)
 /** Forma padrão de uma habilidade embutida (dados antigos não tinham forma). */
 export const defaultShape = (id: string): Shape =>
   DEFAULT_AGENTS.flatMap((a) => a.abilities).find((ab) => ab.id === id)?.shape ?? 'ponto'
+
+/** Medidas padrão de uma habilidade embutida. */
+export const defaultSize = (id: string): AbilitySize | undefined =>
+  DEFAULT_AGENTS.flatMap((a) => a.abilities).find((ab) => ab.id === id)?.size
 
 /** Ícone padrão de uma habilidade embutida, pra "restaurar padrão". */
 export const defaultAbilityIcon = (id: string) =>
@@ -111,7 +144,12 @@ export interface ApiMap {
   displayIcon: string | null
   listViewIconTall: string | null
   splash: string | null
+  /** Unidades do mundo (cm) → fração do minimapa. */
+  xMultiplier?: number
 }
+
+/** Escala do mapa: fração do minimapa por metro. */
+export const mapScale = (m: Pick<ApiMap, 'xMultiplier'>) => (m.xMultiplier && m.xMultiplier > 0 ? m.xMultiplier * 100 : undefined)
 
 /** Só mapas competitivos têm descrição tática (A/B Sites) e minimapa. */
 export function toGameMaps(apiMaps: ApiMap[], now = Date.now()): GameMap[] {
@@ -125,6 +163,7 @@ export function toGameMaps(apiMaps: ApiMap[], now = Date.now()): GameMap[] {
       cover: { url: m.listViewIconTall ?? m.splash ?? undefined },
       minimap: { url: m.displayIcon ?? undefined },
       rotation: 0,
+      scale: mapScale(m),
       order: i,
       createdAt: now,
     }))

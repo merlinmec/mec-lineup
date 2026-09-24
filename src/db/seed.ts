@@ -1,4 +1,4 @@
-import { DEFAULT_AGENTS, fetchMaps } from '../lib/valorantApi'
+import { DEFAULT_AGENTS, fetchMaps, mapScale, type ApiMap } from '../lib/valorantApi'
 import { db, type LineupDB } from './db'
 import type { Settings } from './types'
 
@@ -33,11 +33,27 @@ export async function ensureSeeded(database: LineupDB = db, loadMaps = fetchMaps
   })
 }
 
+/**
+ * Mapas salvos antes da escala existir: busca a escala na API uma vez. Sem
+ * rede, as formas seguem com a escala média até a próxima abertura.
+ */
+export async function fillMapScales(database: LineupDB = db, load = () => fetch('https://valorant-api.com/v1/maps').then((r) => r.json() as Promise<{ data: ApiMap[] }>)) {
+  const missing = (await database.maps.toArray()).filter((m) => m.scale === undefined)
+  if (!missing.length) return
+  const byId = new Map((await load()).data.map((m) => [m.uuid, mapScale(m)]))
+  for (const m of missing) {
+    const scale = byId.get(m.id)
+    if (scale) await database.maps.update(m.id, { scale })
+  }
+}
+
 let pending: Promise<void> | null = null
 
 /** Evita seed duplicado quando o StrictMode monta os efeitos duas vezes. */
 export function seedOnce() {
-  pending ??= ensureSeeded().catch((err) => {
+  pending ??= ensureSeeded()
+    .then(() => void fillMapScales().catch(() => {}))
+    .catch((err) => {
     pending = null
     throw err
   })
