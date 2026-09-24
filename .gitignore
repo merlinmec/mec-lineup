@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+*.tsbuildinfo
+
+# prints de outros apps e artes da Riot usados só como referência visual
+referencias/
