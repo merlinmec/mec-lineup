@@ -10,3 +10,6 @@ logs/
 
 # prints de outros apps e artes da Riot usados só como referência visual
 referencias/
+
+# guia de estudo pessoal, fora do repositório
+mec-explain.txt
