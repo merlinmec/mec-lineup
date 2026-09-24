@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "servir": "vite preview",
+    "atualizar": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/reiniciar.ps1",
+    "autostart:ligar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/autostart.ps1 -Ligar",
+    "autostart:desligar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/autostart.ps1 -Desligar",
     "preview": "vite preview",
     "test": "vitest run"
   },

@@ -10,12 +10,14 @@ import { dailyName, dailyToPrune, LATEST_FILE, replacedName, type BackupMeta } f
  * O navegador não consegue gravar numa pasta fixa sem o usuário escolher;
  * o servidor consegue, sem clique e sem permissão expirando.
  *
- * Só existe no servidor local do Vite (dev/preview), não num deploy estático.
+ * Só existe no servidor local (`npm run servir` / `npm run dev`), não num deploy estático.
  */
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
-/** MEC_BACKUP_DIR sobrescreve a pasta (usado nos testes de ponta a ponta). */
+/** App de uso (preview, porta 5180). MEC_BACKUP_DIR sobrescreve (testes). */
 export const BACKUP_DIR = process.env.MEC_BACKUP_DIR ?? resolve(ROOT, 'backups')
+/** Desenvolvimento (porta 5181): pasta própria, pra testes não sobrescreverem o backup real. */
+const DEV_BACKUP_DIR = process.env.MEC_BACKUP_DIR ?? resolve(ROOT, 'backups-dev')
 const MAX_BODY = 512 * 1024 * 1024 // prints em base64 somam rápido
 // Header customizado força preflight de CORS: outro site aberto no navegador
 // não consegue mandar POST pra cá e sobrescrever o backup.
@@ -115,7 +117,7 @@ export function backupMiddleware(dir = BACKUP_DIR): Connect.NextHandleFunction {
 export function backupPlugin(): Plugin {
   return {
     name: 'mec-lineup-backup',
-    configureServer: (server) => void server.middlewares.use(backupMiddleware(BACKUP_DIR)),
+    configureServer: (server) => void server.middlewares.use(backupMiddleware(DEV_BACKUP_DIR)),
     configurePreviewServer: (server) => void server.middlewares.use(backupMiddleware(BACKUP_DIR)),
   }
 }

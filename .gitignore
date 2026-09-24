@@ -5,6 +5,8 @@ dist
 
 # backups automáticos: seus dados e prints, e podem ficar grandes
 backups/
+backups-dev/
+logs/
 
 # prints de outros apps e artes da Riot usados só como referência visual
 referencias/
